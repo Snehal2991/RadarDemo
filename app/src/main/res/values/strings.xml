@@ -1,0 +1,7 @@
+<resources>
+    <string name="title_activity_maps">Map</string>
+    <string name="app_name">My Radar App</string>
+    <string name="user_id">User ID</string>
+    <string name="track_once">Track Once</string>
+    <string name="tracking">Tracking</string>
+</resources>
