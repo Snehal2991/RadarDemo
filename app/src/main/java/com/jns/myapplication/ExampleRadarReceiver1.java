@@ -6,9 +6,14 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkInfo;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
@@ -28,6 +33,8 @@ import io.radar.sdk.model.RadarEvent;
 import io.radar.sdk.model.RadarGeofence;
 import io.radar.sdk.model.RadarUser;
 
+import static android.content.Context.BATTERY_SERVICE;
+
 public class ExampleRadarReceiver1 extends RadarReceiver {
 
     private static final String TAG = "ExampleRadarReceiver";
@@ -36,6 +43,8 @@ public class ExampleRadarReceiver1 extends RadarReceiver {
 
     @Override
     public void onEventsReceived(@NonNull Context context, @NonNull RadarEvent[] events, @NonNull RadarUser user) {
+        Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG onEventsReceived  " + events[0].getType());
+
         Log.e("TAG", "onEventsReceived: " + events[0].getType());
         Toast.makeText(context, "onEventsReceived:  " + events[0].getType(), Toast.LENGTH_SHORT).show();
         isEventReceived = true;
@@ -52,19 +61,93 @@ public class ExampleRadarReceiver1 extends RadarReceiver {
 
         isEventReceived = false;
         String address = getAddress(location.getLatitude(), location.getLongitude(), context);
-        Log.e("TAG", "onLocationUpdated: " + address);
+
         Toast.makeText(context, "onLocationUpdated " + address, Toast.LENGTH_SHORT).show();
         String state = "Moved to";
         if (user.getStopped()) {
             Toast.makeText(context, "onLocationUpdated user stopped at  " + address, Toast.LENGTH_SHORT).show();
-            Log.e("TAG", "onLocationUpdated user is stopped : ");
             state = "Stopped at";
-            Radar.stopTracking();
         }
-        isUserInGeofence(context, state, address, user);
+
+        Log.e("TAG", " onLocationUpdated  state:: " + state + " address : " + address);
+        Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG onLocationUpdated  state: " + state + " address : " + address);
+
+        getNetworkState(context);
+        getBatteryPercentage(context);
+
+        notify(context, state, address);
+
+        //isUserInGeofence(context, state, address, user);
 
 
     }
+
+
+    public void getNetworkState(Context context) {
+        ConnectivityManager connMgr =
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        boolean isWifiConn = false;
+        boolean isMobileConn = false;
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && isOnline(context)) {
+            for (Network network : connMgr.getAllNetworks()) {
+                NetworkInfo networkInfo = connMgr.getNetworkInfo(network);
+                if (networkInfo.getType() == ConnectivityManager.TYPE_WIFI) {
+                    isWifiConn |= networkInfo.isConnected();
+                }
+                if (networkInfo.getType() == ConnectivityManager.TYPE_MOBILE) {
+                    isMobileConn |= networkInfo.isConnected();
+                }
+            }
+            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG NetworkState : Wifi connected: " + isWifiConn);
+            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG NetworkState : Mobile connected: " + isMobileConn);
+
+            Log.e("TAG getNetworkState", "Wifi connected: " + isWifiConn);
+            Log.e("TAG getNetworkState", "Mobile connected: " + isMobileConn);
+        }
+
+    }
+
+
+    public boolean isOnline(Context context) {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        return (networkInfo != null && networkInfo.isConnected());
+    }
+
+
+    public void getBatteryPercentage(Context context) {
+        BatInfoReceiver batInfoReceiver = new BatInfoReceiver();
+
+        if (Build.VERSION.SDK_INT >= 21) {
+            BatteryManager bm = (BatteryManager) context.getSystemService(BATTERY_SERVICE);
+            int batteryPercentage = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+
+            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG >= 21 BatteryPercentage : " + batteryPercentage + "\n " +
+                    "************************************* \n");
+
+            Log.e("TAG  ", "batteryPercentage for api  >= 21  : " + batteryPercentage);
+
+
+        } else {
+            IntentFilter iFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+            Intent batteryStatus = context.registerReceiver(batInfoReceiver, iFilter);
+
+            int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1;
+            int scale = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1) : -1;
+
+            double batteryPct = level / (double) scale;
+            int batteryPercentage = (int) (batteryPct * 100);
+            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(), "TAG < 21 BatteryPercentage : " + batteryPercentage + "\n " +
+                    "************************************* \n" );
+
+            Log.e("TAG  ", "batteryPercentage for api  < 21  : " + batteryPercentage);
+        }
+
+    }
+
 
     private void isUserInGeofence(Context context, String state, String address, RadarUser user) {
         RadarGeofence[] geofences = user.getGeofences();
@@ -72,17 +155,17 @@ public class ExampleRadarReceiver1 extends RadarReceiver {
             for (RadarGeofence geofence : geofences) {
                 if (geofence != null && geofence.getTag() != null) {
                     switch (geofence.getTag()) {
-                        //                        case "park":
-                        //                            state=state+" park- ";
-                        //                            break;
-                        //                        case "attraction":
-                        //                            state=state+" attraction- ";
-                        //                            break;
-                        //                        case "restaurant":
-                        //                            state=state+" restaurant- ";
-                        //                            break;
-                        //                        default:
-                        //                            state=state+" Not listed Geofence type- ";
+                        case "park":
+                            state = state + " park- ";
+                            break;
+                        case "attraction":
+                            state = state + " attraction- ";
+                            break;
+                        case "restaurant":
+                            state = state + " restaurant- ";
+                            break;
+                        default:
+                            state = state + " Not listed Geofence type- ";
                     }
 
                 }
@@ -91,10 +174,10 @@ public class ExampleRadarReceiver1 extends RadarReceiver {
             }
         }
         if (!isEventReceived) {
-            Log.e("TAG", "no event fire location update : " );
+            Log.e("TAG", "no event fire location update : ");
             notify(context, state, address);
         } else {
-            Log.e("TAG", " event received : " );
+            Log.e("TAG", " event received : ");
         }
 
     }

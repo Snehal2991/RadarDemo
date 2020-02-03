@@ -1,9 +1,14 @@
 package com.jns.myapplication;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.BatteryManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -24,6 +29,8 @@ import com.google.android.material.snackbar.Snackbar;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -42,7 +49,9 @@ import io.radar.sdk.model.RadarUser;
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private static final String TAG = "MainActivity";
+    private boolean isEfficientTracking=false;
     private GoogleMap mMap;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,27 +92,34 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                         Snackbar.make(trackOnceButton, statusString, Snackbar.LENGTH_SHORT).show();
 
                         if (status == Radar.RadarStatus.SUCCESS) {
-                            Log.e("TAG", statusString);
+                            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(),"TAG trackOnce: status  "+statusString);
+                            Log.e("TAG trackOnce:", statusString);
 
                             RadarGeofence[] geofences = user.getGeofences();
                             if (geofences != null) {
                                 for (RadarGeofence geofence : geofences) {
                                     String geofenceString = geofence.getDescription();
-                                    Log.e("TAG geofence Description", geofenceString);
+                                    Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(),"TAG trackOnce:  geofence Description  "+geofenceString);
+                                    Log.e("TAG trackOnce : geofence Description", geofenceString);
                                 }
                             }
 
                             if (user.getPlace() != null) {
                                 String placeString = user.getPlace().getName();
-                                Log.e("TAG", placeString);
+                                Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(),"TAG trackOnce: place  "+placeString);
+                                Log.e("TAG trackOnce:", placeString);
                             }
 
                             for (RadarEvent event : events) {
                                 String eventString = Utils.stringForEvent(event);
-                                Log.e("TAG", eventString);
+                                Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(),"TAG trackOnce: event  "+eventString);
+
+                                Log.e("TAG trackOnce:", eventString);
                             }
                         } else {
-                            Log.e("TAG", statusString);
+                            Utils.storeLogToTextFile(Utils.getCurrentTimeStamp(),"TAG trackOnce: status fail  "+statusString);
+
+                            Log.e("TAG trackOnce:", statusString);
                         }
                     }
                 });
@@ -116,63 +132,49 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                                        Log.e("TAG ","trackingSwitch "+isChecked);
-//                                        RadarTrackingOptions radarTrackingOptions = new RadarTrackingOptions.Builder()
-//                                                .priority(Radar.RadarTrackingPriority.EFFICIENCY)
-//                                                .offline(Radar.RadarTrackingOffline.REPLAY_STOPPED)
-//                                                .sync(Radar.RadarTrackingSync.ALL)
-//                                                .build();
-//
-//
-//                                        Radar.startTracking(radarTrackingOptions);
+                    if(isEfficientTracking){
+                        RadarTrackingOptions radarTrackingOptions = new RadarTrackingOptions.Builder()
+                                .priority(Radar.RadarTrackingPriority.EFFICIENCY)
+                                .offline(Radar.RadarTrackingOffline.REPLAY_STOPPED)
+                                .sync(Radar.RadarTrackingSync.ALL)
+                                .build();
+                        Radar.startTracking(radarTrackingOptions);
+
+                    }else {
+                        RadarTrackingOptions radarTrackingOptions = new RadarTrackingOptions.Builder()
+                                .priority(Radar.RadarTrackingPriority.RESPONSIVENESS)
+                                .offline(Radar.RadarTrackingOffline.REPLAY_STOPPED)
+                                .sync(Radar.RadarTrackingSync.ALL)
+                                .build();
+                        Radar.startTracking(radarTrackingOptions);
 
 
-                    Timer timer = new Timer();
-                    timer.schedule(new TimerTask() {
-                        public void run() {
-                            Radar.trackOnce(new RadarCallback() {
-                                @Override
-                                public void onComplete(@NotNull Radar.RadarStatus status,
-                                        @Nullable Location location,
-                                        @Nullable RadarEvent[] events,
-                                        @Nullable RadarUser user) {
-                                    Log.d("Radar", status.toString());
-                                    if (status == Radar.RadarStatus.SUCCESS) {
+                    }
 
-                                        test(location, MainActivity.this, user);
-                                    }else {
-                                        Log.e("TAG","NOT SUCCESS");
-                                    }
-
-                                }
-                            });
-                        }
-                    }, 2, 10000);
-
-                } else {
+                }else {
                     Radar.stopTracking();
                 }
             }
         });
+
+
+
+
+        final Switch trackingEfficiencySwitch = findViewById(R.id.tracking_efficiency_switch);
+        trackingEfficiencySwitch.setOnCheckedChangeListener(new Switch.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                     isEfficientTracking=true;
+
+
+                }else {
+                     isEfficientTracking=true;
+                }
+            }
+        });
+
     }
-
-    public void test(Location location, Context context, RadarUser user) {
-
-        ExampleRadarReceiver1 radarReceiver1 = new ExampleRadarReceiver1();
-
-        String address = radarReceiver1.getAddress(location.getLatitude(), location.getLongitude(), context);
-        Log.e("TAG", "onLocationUpdated: " + address);
-        Toast.makeText(context, "onLocationUpdated " + address, Toast.LENGTH_SHORT).show();
-        String state = "Moved to";
-        if (user.getStopped()) {
-            Toast.makeText(context, "onLocationUpdated user stopped at  " + address, Toast.LENGTH_SHORT).show();
-            Log.e("TAG", "onLocationUpdated user is stopped : ");
-            state = "Stopped at";
-
-        }
-       // radarReceiver1.notify(context, state, address);
-    }
-
 
     @Override
     public void onMapReady(GoogleMap googleMap) {

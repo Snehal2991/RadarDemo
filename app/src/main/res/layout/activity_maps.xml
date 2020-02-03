@@ -52,6 +52,21 @@
                 android:text="@string/track_once" />
 
             <TextView
+                android:id="@+id/efficiency_text_view"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="16dp"
+                android:text="@string/tracking_mode"
+                android:textStyle="bold" />
+
+            <Switch
+                android:id="@+id/tracking_efficiency_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false"/>
+
+            <TextView
                 android:id="@+id/tracking_title_text_view"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -65,6 +80,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="false"/>
+
+
+
+
+
         </LinearLayout>
 
 

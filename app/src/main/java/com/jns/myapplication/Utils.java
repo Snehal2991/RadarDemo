@@ -1,12 +1,22 @@
 package com.jns.myapplication;
 
 import android.content.Context;
+import android.os.Environment;
 import android.provider.Settings;
+import android.provider.SyncStateContract;
+import android.util.Log;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import io.radar.sdk.Radar;
 import io.radar.sdk.model.RadarEvent;
 
 class Utils {
+    private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 
     static String getUserId(Context context) {
         if (context == null) {
@@ -37,6 +47,41 @@ class Utils {
         }
 
     }
+
+    public static String getCurrentTimeStamp() {
+        String currentTimeStamp = null;
+
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat(TIMESTAMP_FORMAT,
+                    java.util.Locale.getDefault());
+            currentTimeStamp = dateFormat.format(new Date());
+        } catch (Exception e) {
+            Log.e("FileLog", Log.getStackTraceString(e));
+        }
+
+        return currentTimeStamp;
+    }
+
+
+    public static void storeLogToTextFile(String time, String description) {
+        try {
+            File root = new File(Environment.getExternalStorageDirectory(), "ApplicationLog");
+            if (!root.exists()) {
+                root.mkdirs();
+            }
+            File file = new File(root, "radar.txt");
+            FileWriter writer = new FileWriter(file, true);
+            writer.append("Time : "+time );
+            writer.append(" Description : "+description +"\n");
+            writer.flush();
+            writer.close();
+        } catch (
+                IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
 
     static String stringForEvent(RadarEvent event) {
         switch (event.getType()) {
